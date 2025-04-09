@@ -28,6 +28,13 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            // User is signed in, go to Reminders screen
+            startActivity(Intent(this, RemindersActivity::class.java))
+            finish()
+        }
+
         auth = FirebaseAuth.getInstance()
 
         // Google sign-in configuration
