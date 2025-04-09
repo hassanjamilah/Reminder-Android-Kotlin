@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "880538704455",
+    "project_id": "udacity-project-4-8eb7b",
+    "storage_bucket": "udacity-project-4-8eb7b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:880538704455:android:15fb72ea1ac9a2d85b2f62",
+        "android_client_info": {
+          "package_name": "com.udacity.project4"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC76Cvv9T0tj7hoPKEZu1St-xJOelu2uTQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
