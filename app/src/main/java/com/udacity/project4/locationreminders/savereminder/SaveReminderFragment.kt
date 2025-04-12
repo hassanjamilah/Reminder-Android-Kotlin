@@ -5,6 +5,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.databinding.DataBindingUtil
+import androidx.navigation.fragment.findNavController
+import com.google.android.gms.maps.model.PointOfInterest
 import com.udacity.project4.R
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
@@ -49,6 +51,11 @@ class SaveReminderFragment : BaseFragment() {
             // TODO: use the user entered reminder details to:
             //  1) add a geofencing request
             //  2) save the reminder to the local db
+        }
+
+        val savedStateHandle = findNavController().currentBackStackEntry?.savedStateHandle
+        savedStateHandle?.getLiveData<PointOfInterest>("selectedPOI")?.observe(viewLifecycleOwner) { poi ->
+            _viewModel.locationSelected(poi.name, poi.latLng.latitude, poi.latLng.longitude)
         }
     }
 
