@@ -1,8 +1,18 @@
 package com.udacity.project4.locationreminders.savereminder
 
+import android.Manifest
 import android.app.Application
+import android.app.PendingIntent
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofencingRequest
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.PointOfInterest
 import com.udacity.project4.R
@@ -10,6 +20,7 @@ import com.udacity.project4.base.BaseViewModel
 import com.udacity.project4.base.NavigationCommand
 import com.udacity.project4.locationreminders.data.ReminderDataSource
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
+import com.udacity.project4.locationreminders.geofence.GeofenceBroadcastReceiver
 import com.udacity.project4.locationreminders.reminderslist.ReminderDataItem
 import kotlinx.coroutines.launch
 
@@ -59,10 +70,54 @@ class SaveReminderViewModel(val app: Application, val dataSource: ReminderDataSo
                     reminderData.id
                 )
             )
+            addGeofence(reminderData)
             showLoading.value = false
             showToast.value = app.getString(R.string.reminder_saved)
             navigationCommand.value = NavigationCommand.Back
         }
+
+
+    }
+
+    private fun addGeofence(reminderData: ReminderDataItem) {
+        if (ActivityCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e("SaveReminderViewModel", "Location permission not granted")
+            return
+        }
+
+        val geofence = Geofence.Builder()
+            .setRequestId(reminderData.id)
+            .setCircularRegion(
+                reminderData.latitude!!,
+                reminderData.longitude!!,
+                100f // radius in meters
+            )
+            .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
+            .build()
+
+        val geofencingRequest = GeofencingRequest.Builder()
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .addGeofence(geofence)
+            .build()
+
+        val intent = Intent(app, GeofenceBroadcastReceiver::class.java)
+        val geofencePendingIntent = PendingIntent.getBroadcast(
+            app,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val geofencingClient = LocationServices.getGeofencingClient(app)
+
+        geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)
+            .addOnSuccessListener {
+                Log.d("SaveReminderViewModel", "Geofence added for ID: ${reminderData.id}")
+            }
+            .addOnFailureListener {
+                Log.e("SaveReminderViewModel", "Failed to add geofence", it)
+            }
     }
 
     /**
