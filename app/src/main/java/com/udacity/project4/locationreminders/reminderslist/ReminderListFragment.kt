@@ -43,6 +43,7 @@ class ReminderListFragment : BaseFragment() {
         }
     }
 
+
     override fun onResume() {
         super.onResume()
         // Load the reminders list on the ui
