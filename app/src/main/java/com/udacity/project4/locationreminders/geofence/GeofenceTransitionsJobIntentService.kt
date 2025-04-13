@@ -1,12 +1,18 @@
 package com.udacity.project4.locationreminders.geofence
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.JobIntentService
+import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofenceStatusCodes
 import com.google.android.gms.location.GeofencingEvent
+import com.udacity.project4.R
+import com.udacity.project4.locationreminders.ReminderDescriptionActivity
 import com.udacity.project4.locationreminders.data.ReminderDataSource
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
 import com.udacity.project4.locationreminders.data.dto.Result
@@ -69,17 +75,52 @@ class GeofenceTransitionsJobIntentService : JobIntentService(), CoroutineScope {
             val result = remindersLocalRepository.getReminder(requestId)
             if (result is Result.Success<ReminderDTO>) {
                 val reminderDTO = result.data
-                sendNotification(
-                    this@GeofenceTransitionsJobIntentService,
-                    ReminderDataItem(
-                        reminderDTO.title,
-                        reminderDTO.description,
-                        reminderDTO.location,
-                        reminderDTO.latitude,
-                        reminderDTO.longitude,
-                        reminderDTO.id
-                    )
+
+                val reminderDataItem = ReminderDataItem(
+                    reminderDTO.title,
+                    reminderDTO.description,
+                    reminderDTO.location,
+                    reminderDTO.latitude,
+                    reminderDTO.longitude,
+                    reminderDTO.id
                 )
+
+                // Build intent to open ReminderDescriptionActivity
+                val intent = ReminderDescriptionActivity.newIntent(
+                    applicationContext,
+                    reminderDataItem
+                )
+
+                val pendingIntent = PendingIntent.getActivity(
+                    applicationContext,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                val channelId = "reminder_channel"
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    val channel = NotificationChannel(
+                        channelId,
+                        "Reminders",
+                        NotificationManager.IMPORTANCE_HIGH
+                    )
+                    notificationManager.createNotificationChannel(channel)
+                }
+
+                val notification = NotificationCompat.Builder(applicationContext, channelId)
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setContentTitle(reminderDataItem.title)
+                    .setContentText(reminderDataItem.description)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .build()
+
+                notificationManager.notify(requestId.hashCode(), notification)
+
             } else if (result is Result.Error) {
                 Log.e("GeofenceService", "Reminder not found for requestId=$requestId: ${result.message}")
             }
