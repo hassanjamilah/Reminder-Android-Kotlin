@@ -1,5 +1,6 @@
 package com.udacity.project4
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -7,6 +8,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.firebase.ui.auth.AuthUI
+import com.firebase.ui.auth.IdpResponse
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -17,61 +20,34 @@ import com.udacity.project4.databinding.ActivityLoginBinding
 import com.udacity.project4.locationreminders.RemindersActivity
 
 class LoginActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityLoginBinding
-    private lateinit var auth: FirebaseAuth
-    private lateinit var googleSignInClient: GoogleSignInClient
-
-    private val RC_SIGN_IN = 9001
+    companion object {
+        private const val RC_SIGN_IN = 123
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityLoginBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        val user = FirebaseAuth.getInstance().currentUser
-        if (user != null) {
-            // User is signed in, go to Reminders screen
-            startActivity(Intent(this, RemindersActivity::class.java))
-            finish()
+        // If user already signed in, go to RemindersActivity
+        if (FirebaseAuth.getInstance().currentUser != null) {
+            navigateToReminders()
+        } else {
+            launchSignInFlow()
         }
+    }
 
-        auth = FirebaseAuth.getInstance()
+    private fun launchSignInFlow() {
+        val providers = arrayListOf(
+            AuthUI.IdpConfig.EmailBuilder().build(),
+            AuthUI.IdpConfig.GoogleBuilder().build()
+        )
 
-        // Google sign-in configuration
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
-            .requestEmail()
+        val signInIntent = AuthUI.getInstance()
+            .createSignInIntentBuilder()
+            .setAvailableProviders(providers)
+            .setLogo(R.drawable.ic_launcher_foreground) // Optional
+            .setTheme(R.style.AppTheme) // Optional
             .build()
-        googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        binding.loginButton.setOnClickListener {
-            val email = binding.emailEditText.text.toString()
-            val password = binding.passwordEditText.text.toString()
-            loginWithEmail(email, password)
-        }
-
-        binding.googleSignInButton.setOnClickListener {
-            signInWithGoogle()
-        }
-
-        binding.goToRegisterText.setOnClickListener {
-            startActivity(Intent(this, RegisterActivity::class.java))
-        }
-    }
-
-    private fun loginWithEmail(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener(this) {
-                if (it.isSuccessful) {
-                    navigateToReminders()
-                } else {
-                    Toast.makeText(this, "Login failed.", Toast.LENGTH_SHORT).show()
-                }
-            }
-    }
-
-    private fun signInWithGoogle() {
-        val signInIntent = googleSignInClient.signInIntent
         startActivityForResult(signInIntent, RC_SIGN_IN)
     }
 
@@ -79,26 +55,17 @@ class LoginActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == RC_SIGN_IN) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                firebaseAuthWithGoogle(account.idToken!!)
-            } catch (e: ApiException) {
-                Toast.makeText(this, "Google sign-in failed", Toast.LENGTH_SHORT).show()
+            val response = IdpResponse.fromResultIntent(data)
+
+            if (resultCode == Activity.RESULT_OK) {
+                // Sign-in succeeded
+                navigateToReminders()
+            } else {
+                Toast.makeText(this, "Sign-in failed: ${response?.error?.message}", Toast.LENGTH_SHORT).show()
+                // Optionally: Relaunch sign-in or finish()
+                finish()
             }
         }
-    }
-
-    private fun firebaseAuthWithGoogle(idToken: String) {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnCompleteListener(this) {
-                if (it.isSuccessful) {
-                    navigateToReminders()
-                } else {
-                    Toast.makeText(this, "Authentication failed.", Toast.LENGTH_SHORT).show()
-                }
-            }
     }
 
     private fun navigateToReminders() {
