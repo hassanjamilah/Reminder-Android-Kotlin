@@ -7,12 +7,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.location.Geofence
-import com.google.android.gms.location.GeofencingRequest
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.PointOfInterest
 import com.udacity.project4.R
@@ -26,6 +23,7 @@ import kotlinx.coroutines.launch
 
 class SaveReminderViewModel(val app: Application, val dataSource: ReminderDataSource) :
     BaseViewModel(app) {
+
     val reminderTitle = MutableLiveData<String>()
     val reminderDescription = MutableLiveData<String>()
     val reminderSelectedLocationStr = MutableLiveData<String>()
@@ -33,9 +31,8 @@ class SaveReminderViewModel(val app: Application, val dataSource: ReminderDataSo
     val latitude = MutableLiveData<Double>()
     val longitude = MutableLiveData<Double>()
 
-    /**
-     * Clear the live data objects to start fresh next time the view model gets called
-     */
+    private val geofencingClient = LocationServices.getGeofencingClient(app.applicationContext)
+
     fun onClear() {
         reminderTitle.value = null
         reminderDescription.value = null
@@ -45,52 +42,50 @@ class SaveReminderViewModel(val app: Application, val dataSource: ReminderDataSo
         longitude.value = null
     }
 
-    /**
-     * Validate the entered data then saves the reminder data to the DataSource
-     */
     fun validateAndSaveReminder(reminderData: ReminderDataItem) {
         if (validateEnteredData(reminderData)) {
-            saveReminder(reminderData)
+            checkDeviceLocationAndPermissionsThenAddGeofence(reminderData)
         }
     }
 
-    /**
-     * Save the reminder to the data source
-     */
-    private fun saveReminder(reminderData: ReminderDataItem) {
-        showLoading.value = true
-        viewModelScope.launch {
-            dataSource.saveReminder(
-                ReminderDTO(
-                    reminderData.title,
-                    reminderData.description,
-                    reminderData.location,
-                    reminderData.latitude,
-                    reminderData.longitude,
-                    reminderData.id
-                )
-            )
-            addGeofence(reminderData)
-            showLoading.value = false
-            showToast.value = app.getString(R.string.reminder_saved)
-            navigationCommand.value = NavigationCommand.Back
+    private fun validateEnteredData(reminderData: ReminderDataItem): Boolean {
+        if (reminderData.title.isNullOrEmpty()) {
+            showSnackBarInt.value = R.string.err_enter_title
+            return false
+        }
+        if (reminderData.location.isNullOrEmpty()) {
+            showSnackBarInt.value = R.string.err_select_location
+            return false
+        }
+        return true
+    }
+
+    private fun checkDeviceLocationAndPermissionsThenAddGeofence(reminderData: ReminderDataItem) {
+        val locationRequest = LocationRequest.create().apply {
+            priority = Priority.PRIORITY_HIGH_ACCURACY
         }
 
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val settingsClient = LocationServices.getSettingsClient(app.applicationContext)
+        val locationSettingsResponseTask = settingsClient.checkLocationSettings(builder.build())
 
+        locationSettingsResponseTask.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Log.d("SaveReminderViewModel", "Device location is ON")
+                addGeofence(reminderData)
+            } else {
+                showSnackBarInt.postValue(R.string.location_required_error)
+            }
+        }
     }
 
     private fun addGeofence(reminderData: ReminderDataItem) {
-        if (ActivityCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.e("SaveReminderViewModel", "Location permission not granted")
-            return
-        }
-
         val geofence = Geofence.Builder()
             .setRequestId(reminderData.id)
             .setCircularRegion(
                 reminderData.latitude!!,
                 reminderData.longitude!!,
-                100f // radius in meters
+                100f
             )
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
@@ -109,31 +104,43 @@ class SaveReminderViewModel(val app: Application, val dataSource: ReminderDataSo
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val geofencingClient = LocationServices.getGeofencingClient(app)
+        if (ActivityCompat.checkSelfPermission(
+                app,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            showSnackBarInt.postValue(R.string.permission_denied_explanation)
+            return
+        }
 
         geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)
             .addOnSuccessListener {
-                Log.d("SaveReminderViewModel", "Geofence added for ID: ${reminderData.id}")
+                Log.d("SaveReminderViewModel", "Geofence added successfully")
+                saveReminder(reminderData)
             }
-            .addOnFailureListener {
-                Log.e("SaveReminderViewModel", "Failed to add geofence", it)
+            .addOnFailureListener { e ->
+                Log.e("SaveReminderViewModel", "Failed to add geofence", e)
+                showSnackBarInt.postValue(R.string.geofence_not_added)
             }
     }
 
-    /**
-     * Validate the entered data and show error to the user if there's any invalid data
-     */
-    private fun validateEnteredData(reminderData: ReminderDataItem): Boolean {
-        if (reminderData.title.isNullOrEmpty()) {
-            showSnackBarInt.value = R.string.err_enter_title
-            return false
+    private fun saveReminder(reminderData: ReminderDataItem) {
+        showLoading.value = true
+        viewModelScope.launch {
+            dataSource.saveReminder(
+                ReminderDTO(
+                    reminderData.title,
+                    reminderData.description,
+                    reminderData.location,
+                    reminderData.latitude,
+                    reminderData.longitude,
+                    reminderData.id
+                )
+            )
+            showLoading.postValue(false)
+            showToast.postValue(app.getString(R.string.reminder_saved))
+            navigationCommand.postValue(NavigationCommand.Back)
         }
-
-        if (reminderData.location.isNullOrEmpty()) {
-            showSnackBarInt.value = R.string.err_select_location
-            return false
-        }
-        return true
     }
 
     fun locationSelected(name: String, lat: Double, lng: Double) {
