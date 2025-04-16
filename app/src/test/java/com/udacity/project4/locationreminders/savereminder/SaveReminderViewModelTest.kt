@@ -11,6 +11,7 @@ import com.udacity.project4.utils.getOrAwaitValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -47,16 +48,25 @@ class SaveReminderViewModelTest {
     fun saveReminder_shouldShowLoading() = runTest(testDispatcher) {
         val reminder = ReminderDataItem("Title", "Description", "Location", 1.0, 1.0)
 
-        viewModel.validateAndSaveReminder(reminder)
+        // Run the block that triggers the coroutine and synchronous update
 
-        // Initially loading should be true
-        assertThat(viewModel.showLoading.getOrAwaitValue()).isTrue()
 
-        // Advance coroutine execution
+        advanceUntilIdle()
+        // Since showLoading.value = true is synchronous, this should now capture it
+        viewModel.saveReminder(reminder)
+        val loadingBefore = viewModel.showLoading.getOrAwaitValue()
+
+
+        assertThat(loadingBefore).isTrue() // Assert immediately after it's set
+        // Now let the coroutine run to completion
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Then loading should be false
-        assertThat(viewModel.showLoading.getOrAwaitValue()).isFalse()
+        // This should now capture the 'false' value set inside the coroutine
+        // Use getOrAwaitValue again to ensure we wait for the update from the coroutine
+        val loadingAfter = viewModel.showLoading.getOrAwaitValue()
+        assertThat(loadingAfter).isFalse()
+
+
     }
 
     @Test

@@ -8,16 +8,7 @@
       <SelectionState runConfigName="ReminderListFragmentTest">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
-      <SelectionState runConfigName="SaveReminderFragmentTest">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
-      <SelectionState runConfigName="saveReminderWithoutTitle_showsErrorSnackbar()">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
-      <SelectionState runConfigName="saveReminder_noTitle_showsErrorSnackbar()">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
-      <SelectionState runConfigName="saveReminder_validData_showsToastAndNavigatesBackToList()">
+      <SelectionState runConfigName="clickAddReminderFAB_navigatesToSaveReminderFragment()">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>
